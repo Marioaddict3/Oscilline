@@ -1,0 +1,196 @@
+name: CI
+
+# Push is main only. Feature branches are covered by pull_request.
+# No schedule. Docs and README changes stay outside the path allow-list.
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "src/**"
+      - "include/**"
+      - "tools/**"
+      - "tests/**"
+      - "CMakeLists.txt"
+      - "**/CMakeLists.txt"
+      - "CMakePresets.json"
+      - "cmake/**"
+      - "*.cmake"
+      - "**/*.cmake"
+      - ".clang-format"
+      - ".clang-tidy"
+      - "vcpkg.json"
+      - "**/vcpkg.json"
+      - "vcpkg-configuration.json"
+      - "conanfile.txt"
+      - "conanfile.py"
+      - "**/conanfile.txt"
+      - "**/conanfile.py"
+      - ".github/workflows/ci.yml"
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
+    paths:
+      - "src/**"
+      - "include/**"
+      - "tools/**"
+      - "tests/**"
+      - "CMakeLists.txt"
+      - "**/CMakeLists.txt"
+      - "CMakePresets.json"
+      - "cmake/**"
+      - "*.cmake"
+      - "**/*.cmake"
+      - ".clang-format"
+      - ".clang-tidy"
+      - "vcpkg.json"
+      - "**/vcpkg.json"
+      - "vcpkg-configuration.json"
+      - "conanfile.txt"
+      - "conanfile.py"
+      - "**/conanfile.txt"
+      - "**/conanfile.py"
+      - ".github/workflows/ci.yml"
+  workflow_dispatch:
+
+# One in-flight run per ref. A newer push or pull-request sync cancels the older one.
+concurrency:
+  group: "${{ github.workflow }}-${{ github.ref }}"
+  cancel-in-progress: true
+
+jobs:
+  linux:
+    name: linux-${{ matrix.name }}
+    # A private repository uses the self-hosted box. A public one uses a
+    # GitHub-hosted runner, so pull requests from forks never run on the box.
+    runs-on: ${{ github.event.repository.private && fromJSON('["self-hosted", "linux", "x64", "box"]') || 'ubuntu-latest' }}
+    # Draft pull requests wait until they are marked ready.
+    if: "github.event.pull_request.draft == false || github.event_name != 'pull_request'"
+    # Matrix jobs share one runner workspace. Keep each configure tree separate.
+    env:
+      BUILD_DIR: build/${{ matrix.name }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: gcc
+            cc: gcc
+            cxx: g++
+            sanitizers: OFF
+            format: true
+          - name: clang
+            cc: clang
+            cxx: clang++
+            sanitizers: OFF
+            format: false
+          - name: clang-asan
+            cc: clang
+            cxx: clang++
+            sanitizers: ON
+            format: false
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install tools
+        env:
+          JOB_CC: ${{ matrix.cc }}
+          JOB_CXX: ${{ matrix.cxx }}
+          JOB_SANITIZERS: ${{ matrix.sanitizers }}
+        run: |
+          set -euo pipefail
+          missing=0
+          require() {
+            if ! command -v "$1" >/dev/null 2>&1; then
+              echo "missing tool: $1"
+              missing=1
+            fi
+          }
+          # The box already has these. Skip apt-get, and do not call sudo, when they are present.
+          require cmake
+          require ninja
+          require clang-format
+          require pkg-config
+          require "${JOB_CC}"
+          require "${JOB_CXX}"
+          # SDL3's X11 and GL backends need these modules. The apt-get list
+          # below already installs them; failing the presence check is what
+          # makes a runner that has compilers but not the headers install them.
+          require_pc() {
+            if ! pkg-config --exists "$1"; then
+              echo "missing pkg-config module: $1"
+              missing=1
+            fi
+          }
+          require_pc x11
+          require_pc gl
+          if [[ "${JOB_SANITIZERS}" == "ON" ]]; then
+            asan_rt="$(clang -print-file-name=libclang_rt.asan-x86_64.so 2>/dev/null || true)"
+            if [[ -z "${asan_rt}" || "${asan_rt}" == "libclang_rt.asan-x86_64.so" || ! -e "${asan_rt}" ]]; then
+              echo "missing Clang address sanitizer runtime"
+              missing=1
+            fi
+          fi
+          if [[ "${missing}" -eq 0 ]]; then
+            echo "toolchain already present; skipping apt-get"
+            exit 0
+          fi
+          if ! command -v sudo >/dev/null 2>&1 || ! sudo -n true >/dev/null 2>&1; then
+            echo "Required packages are missing and this runner has no sudo."
+            echo "Install the packages listed in CONTRIBUTING.md."
+            exit 1
+          fi
+          # dumpversion may be "18", "18.1.3", or a vendor string. Keep the first integer.
+          raw="$(clang -dumpversion 2>/dev/null || true)"
+          major="$(printf '%s\n' "${raw}" | grep -oE '^[0-9]+' | head -n 1 || true)"
+          if [[ -z "${major}" ]]; then
+            raw="$(clang --version 2>/dev/null | head -n 1 || true)"
+            major="$(printf '%s\n' "${raw}" | grep -oE '[0-9]+' | head -n 1 || true)"
+          fi
+          if [[ -n "${major}" ]]; then
+            rt_pkg="libclang-rt-${major}-dev"
+          else
+            echo "Clang reported no major version (${raw:-empty}); using libclang-rt-dev"
+            rt_pkg="libclang-rt-dev"
+          fi
+          sudo apt-get update
+          sudo apt-get install -y \
+            ninja-build clang-format pkg-config cmake \
+            g++ clang \
+            "${rt_pkg}" \
+            libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxi-dev \
+            libxfixes-dev libxss-dev libxrender-dev libxtst-dev \
+            libxkbcommon-dev libwayland-dev libdecor-0-dev \
+            libgl1-mesa-dev libegl1-mesa-dev libgles2-mesa-dev \
+            libasound2-dev libpulse-dev libudev-dev libdbus-1-dev \
+            libdrm-dev libgbm-dev
+      - name: Cache SDL3 source
+        id: sdl-cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.BUILD_DIR }}/_deps/sdl3-src
+          key: sdl3-release-3.4.18-${{ runner.os }}
+      - name: Configure
+        env:
+          CC: ${{ matrix.cc }}
+          CXX: ${{ matrix.cxx }}
+        run: |
+          cmake_args=(
+            --preset debug
+            -B "${GITHUB_WORKSPACE}/${BUILD_DIR}"
+            -DOSCILLINE_ENABLE_SANITIZERS=${{ matrix.sanitizers }}
+          )
+          sdl_src="${GITHUB_WORKSPACE}/${BUILD_DIR}/_deps/sdl3-src"
+          if [[ -f "${sdl_src}/CMakeLists.txt" ]]; then
+            cmake_args+=("-DFETCHCONTENT_SOURCE_DIR_SDL3=${sdl_src}")
+          fi
+          cmake "${cmake_args[@]}"
+      - name: Drop SDL git metadata before caching
+        if: steps.sdl-cache.outputs.cache-hit != 'true'
+        run: rm -rf "${GITHUB_WORKSPACE}/${BUILD_DIR}/_deps/sdl3-src/.git"
+      - name: Build
+        run: cmake --build "${GITHUB_WORKSPACE}/${BUILD_DIR}"
+      - name: Test
+        run: ctest --test-dir "${GITHUB_WORKSPACE}/${BUILD_DIR}" --output-on-failure
+      - name: clang-format
+        if: matrix.format
+        run: |
+          mapfile -t sources < <(find include src tests -type f \( -name '*.hpp' -o -name '*.cpp' \))
+          clang-format --dry-run -Werror "${sources[@]}"

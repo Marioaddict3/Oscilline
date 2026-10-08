@@ -1,0 +1,88 @@
+name: CI hosted
+
+# Manual only. Push and pull_request do not start macOS or Windows runners.
+# No schedule, and this workflow does not upload artifacts.
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: "${{ github.workflow }}-${{ github.ref }}"
+  cancel-in-progress: true
+
+jobs:
+  macos:
+    name: macos-clang
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install ninja
+        run: brew install ninja
+      - name: Cache SDL3 source
+        id: sdl-cache
+        uses: actions/cache@v4
+        with:
+          path: build/debug/_deps/sdl3-src
+          key: sdl3-release-3.4.18-${{ runner.os }}
+      - name: Configure
+        run: |
+          cmake_args=(--preset debug)
+          if [[ -f "${GITHUB_WORKSPACE}/build/debug/_deps/sdl3-src/CMakeLists.txt" ]]; then
+            cmake_args+=("-DFETCHCONTENT_SOURCE_DIR_SDL3=${GITHUB_WORKSPACE}/build/debug/_deps/sdl3-src")
+          fi
+          cmake "${cmake_args[@]}"
+      - name: Drop SDL git metadata before caching
+        if: steps.sdl-cache.outputs.cache-hit != 'true'
+        run: rm -rf "${GITHUB_WORKSPACE}/build/debug/_deps/sdl3-src/.git"
+      - name: Build
+        run: cmake --build --preset debug
+      - name: Test
+        run: ctest --preset debug
+
+  windows:
+    name: windows-msvc
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Cache SDL3 source
+        id: sdl-cache
+        uses: actions/cache@v4
+        with:
+          path: build/msvc/_deps/sdl3-src
+          key: sdl3-release-3.4.18-${{ runner.os }}
+      - name: Configure
+        shell: pwsh
+        run: |
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $version = & $vswhere -latest -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationVersion
+          if (-not $version) { throw "MSVC toolset not found" }
+          $major = $version.Split('.')[0]
+          # catalog_productLineVersion is the major number (18), not the CMake year.
+          $year = switch ($major) {
+            "18" { "2026" }
+            "17" { "2022" }
+            "16" { "2019" }
+            "15" { "2017" }
+            default { throw "No CMake generator for Visual Studio $version" }
+          }
+          Write-Host "Using Visual Studio $major $year ($version)"
+          $cmakeArgs = @(
+            "-S", ".",
+            "-B", "build/msvc",
+            "-G", "Visual Studio $major $year",
+            "-A", "x64"
+          )
+          $sdl = Join-Path $env:GITHUB_WORKSPACE "build/msvc/_deps/sdl3-src"
+          if (Test-Path (Join-Path $sdl "CMakeLists.txt")) {
+            $cmakeArgs += "-DFETCHCONTENT_SOURCE_DIR_SDL3=$sdl"
+          }
+          cmake @cmakeArgs
+      - name: Drop SDL git metadata before caching
+        if: steps.sdl-cache.outputs.cache-hit != 'true'
+        shell: pwsh
+        run: |
+          $git = Join-Path $env:GITHUB_WORKSPACE "build/msvc/_deps/sdl3-src/.git"
+          if (Test-Path $git) { Remove-Item -Recurse -Force $git }
+      - name: Build
+        run: cmake --build build/msvc --config Debug
+      - name: Test
+        run: ctest --test-dir build/msvc -C Debug --output-on-failure
