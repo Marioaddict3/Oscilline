@@ -1,0 +1,157 @@
+name: Release packages
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  windows:
+    name: Windows x64
+    runs-on: windows-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+
+      - name: Configure
+        run: >-
+          cmake -S . -B build/package -A x64
+          -DOSCILLINE_PACKAGING=ON
+          -DOSCILLINE_BUILD_TESTS=OFF
+          -DOSCILLINE_WARNINGS_AS_ERRORS=OFF
+
+      - name: Build
+        run: cmake --build build/package --config Release --parallel
+
+      - name: Package ZIP
+        run: cpack --config build/package/CPackConfig.cmake -C Release -B build/package
+
+      - name: Stage release file
+        shell: pwsh
+        run: |
+          $package = Get-ChildItem build/package -Filter *.zip | Select-Object -First 1
+          if (-not $package) { throw "CPack did not create a ZIP package" }
+          New-Item -ItemType Directory -Force dist | Out-Null
+          Copy-Item $package.FullName "dist/Oscilline-$env:GITHUB_REF_NAME-Windows-x64.zip"
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: windows-package
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 14
+
+  macos:
+    name: macOS universal
+    runs-on: macos-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+
+      - name: Install build tools
+        run: brew install cmake ninja
+
+      - name: Configure universal app
+        run: >-
+          cmake -S . -B build/package -G Ninja
+          -DCMAKE_BUILD_TYPE=Release
+          -DOSCILLINE_PACKAGING=ON
+          -DOSCILLINE_BUILD_TESTS=OFF
+          -DOSCILLINE_WARNINGS_AS_ERRORS=OFF
+          "-DCMAKE_OSX_ARCHITECTURES=arm64;x86_64"
+
+      - name: Build
+        run: cmake --build build/package --parallel
+
+      - name: Package DMG
+        run: cpack --config build/package/CPackConfig.cmake -C Release -B build/package
+
+      - name: Stage release file
+        run: |
+          package="$(find build/package -maxdepth 1 -name '*.dmg' -print -quit)"
+          test -n "$package"
+          mkdir -p dist
+          cp "$package" "dist/Oscilline-${GITHUB_REF_NAME}-macOS-universal.dmg"
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: macos-package
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 14
+
+  linux:
+    name: Linux x86_64 AppImage
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            gcc-12 g++-12 ninja-build git curl file pkg-config \
+            libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxi-dev \
+            libxfixes-dev libxss-dev libxrender-dev libxtst-dev \
+            libxkbcommon-dev libwayland-dev libdecor-0-dev \
+            libgl1-mesa-dev libegl1-mesa-dev libgles2-mesa-dev \
+            libasound2-dev libpulse-dev libudev-dev libdbus-1-dev \
+            libdrm-dev libgbm-dev
+
+      - name: Install CMake 3.31.6
+        run: |
+          curl -fsSL https://github.com/Kitware/CMake/releases/download/v3.31.6/cmake-3.31.6-linux-x86_64.tar.gz \
+            | sudo tar -xz -C /opt
+          echo "/opt/cmake-3.31.6-linux-x86_64/bin" >> "$GITHUB_PATH"
+
+      - name: Build AppImage
+        run: CC=gcc-12 CXX=g++-12 packaging/linux/build_appimage.sh build/appimage
+
+      - name: Stage release file
+        run: |
+          package="$(find build/appimage -maxdepth 1 -name '*.AppImage' -print -quit)"
+          test -n "$package"
+          mkdir -p dist
+          cp "$package" "dist/Oscilline-${GITHUB_REF_NAME}-Linux-x86_64.AppImage"
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: linux-package
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 14
+
+  draft-release:
+    name: Create draft GitHub Release
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: [windows, macos, linux]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download all packages
+        uses: actions/download-artifact@v8
+        with:
+          pattern: '*-package'
+          path: dist
+          merge-multiple: true
+
+      - name: Create or update draft release
+        uses: softprops/action-gh-release@v3
+        with:
+          draft: true
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          files: dist/*
