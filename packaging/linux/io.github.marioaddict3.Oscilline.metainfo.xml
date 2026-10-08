@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Copyright (C) 2026 Oscilline contributors -->
+<component type="desktop-application">
+  <id>io.github.marioaddict3.Oscilline</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-2.0-or-later</project_license>
+  <name>Oscilline</name>
+  <summary>Rhythm runs on a vector ribbon</summary>
+  <developer id="io.github.marioaddict3">
+    <name>Marioaddict3</name>
+  </developer>
+  <description>
+    <p>
+      Oscilline is a rhythm game drawn in white vector lines. A figure runs
+      along a ribbon, and you block, loop, wave, and pit past obstacles in time
+      with the music. Clear streaks evolve the figure; misses wear it down.
+    </p>
+    <p>
+      Play My Music charts any WAV, FLAC, or MP3 file into a course at three
+      difficulties. With a disc image you own of the original 1999 PlayStation
+      game, Oscilline also plays that disc's courses and audio. No game data is
+      included: the disc courses need your own disc image, chosen with Load Disc.
+    </p>
+    <p>
+      Oscilline is an unofficial project and is not affiliated with the original
+      game's publisher or developer.
+    </p>
+  </description>
+  <launchable type="desktop-id">io.github.marioaddict3.Oscilline.desktop</launchable>
+  <url type="homepage">https://github.com/Marioaddict3/Oscilline</url>
+  <url type="bugtracker">https://github.com/Marioaddict3/Oscilline/issues</url>
+  <url type="donation">https://ko-fi.com/marioaddict3</url>
+  <url type="vcs-browser">https://github.com/Marioaddict3/Oscilline</url>
+  <branding>
+    <color type="primary" scheme_preference="light">#f58e27</color>
+    <color type="primary" scheme_preference="dark">#8a4a0c</color>
+  </branding>
+  <content_rating type="oars-1.1"/>
+  <supports>
+    <control>keyboard</control>
+    <control>gamepad</control>
+  </supports>
+  <categories>
+    <category>Game</category>
+    <category>ArcadeGame</category>
+  </categories>
+  <keywords>
+    <keyword>rhythm</keyword>
+    <keyword>music</keyword>
+    <keyword>vector</keyword>
+  </keywords>
+  <releases>
+    <release version="0.1.0" date="2026-10-08">
+      <description>
+        <p>First packaged build.</p>
+      </description>
+    </release>
+  </releases>
+</component>

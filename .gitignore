@@ -1,0 +1,13 @@
+build/
+out/
+.cache/
+compile_commands.json
+CMakeUserPresets.json
+.vs/
+.idea/
+*.user
+cmake-build-*/
+.DS_Store
+*.[cC][uU][eE]
+*.[bB][iI][nN]
+*.[iI][sS][oO]

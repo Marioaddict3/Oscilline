@@ -1,0 +1,9 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+// Copyright (C) 2026 Oscilline contributors
+//
+// Version macro filled by CMake. Do not edit the generated copy.
+
+#pragma once
+
+// Filled from the CMake project() VERSION. Do not edit the generated copy.
+#define OSCILLINE_VERSION "@PROJECT_VERSION@"

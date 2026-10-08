@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Oscilline
+Comment=Play rhythm courses drawn as vector lines
+Exec=oscilline
+Icon=io.github.marioaddict3.Oscilline
+Terminal=false
+Categories=Game;ArcadeGame;
+Keywords=rhythm;music;vector;
+StartupWMClass=io.github.marioaddict3.Oscilline

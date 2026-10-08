@@ -1,0 +1,4 @@
+# libdbus locks its connection mutexes in opposite orders from SDL_Init and
+# SDL_Quit. The cycle is inside libdbus on the main thread. It is not an
+# Oscilline data race.
+deadlock:libdbus
