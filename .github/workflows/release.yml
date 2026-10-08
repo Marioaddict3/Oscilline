@@ -120,7 +120,7 @@ jobs:
 
       - name: Stage release file
         run: |
-          package="$(find build/appimage -maxdepth 1 -name '*.AppImage' -print -quit)"
+          package="$(find build/appimage -maxdepth 1 -name 'Oscilline-*.AppImage' -print -quit)"
           test -n "$package"
           mkdir -p dist
           cp "$package" "dist/Oscilline-${GITHUB_REF_NAME}-Linux-x86_64.AppImage"
