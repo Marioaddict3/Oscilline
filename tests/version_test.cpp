@@ -11,5 +11,5 @@
 TEST_CASE("version string is published") {
     const std::string version = oscilline::version_string();
     CHECK_FALSE(version.empty());
-    CHECK(version == "0.1.0");
+    CHECK(version == "0.1.1");
 }

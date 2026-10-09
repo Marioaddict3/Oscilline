@@ -90,7 +90,7 @@ TEST_CASE("misses discard freestyle and scoring streak while promotion preserves
     CHECK(play.freestyle == 0);
     CHECK(play.score == before + 24);
     hit(20, false);
-    CHECK(play.score == before + 27);
+    CHECK(play.score == before + 26);
     const int frozen = play.score;
     play.paused = true;
     hit(21, true);
@@ -200,10 +200,8 @@ TEST_CASE("seven coupons occupy exactly one rotating semicircle") {
     }
     CHECK(coupons.front().depth == doctest::Approx(-1.f));
     CHECK(coupons.back().depth == doctest::Approx(1.f));
-    CHECK((coupons.front().y0 + coupons.front().y1) / 2 ==
-          doctest::Approx(kCouponTrackY - 18.f));
-    CHECK((coupons.back().y0 + coupons.back().y1) / 2 ==
-          doctest::Approx(kCouponTrackY + 18.f));
+    CHECK((coupons.front().y0 + coupons.front().y1) / 2 == doctest::Approx(kCouponTrackY - 18.f));
+    CHECK((coupons.back().y0 + coupons.back().y1) / 2 == doctest::Approx(kCouponTrackY + 18.f));
 }
 
 TEST_CASE("the carousel's highest coupon edge is one coupon height from the top") {

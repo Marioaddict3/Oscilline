@@ -287,9 +287,9 @@ void append_jittered_obstacle(std::vector<Segment>& out,
 }
 
 void jitter_segments(std::span<Segment> segments,
-                    std::int64_t time_ms,
-                    float amplitude_ps,
-                    std::uint32_t salt) {
+                     std::int64_t time_ms,
+                     float amplitude_ps,
+                     std::uint32_t salt) {
     if (!(amplitude_ps > 0.f) || !std::isfinite(amplitude_ps) || segments.empty()) {
         return;
     }

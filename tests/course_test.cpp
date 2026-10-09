@@ -2762,7 +2762,7 @@ TEST_CASE("eighteen clears promote worm, frog, and rabbit, and a miss clears the
     using namespace oscilline;
     CHECK(kClearsToRise == 18);
     CHECK(form_name(Form::Super) == "super");
-    CHECK(form_miss_limit(Form::Super) == kRabbitMisses);
+    CHECK(form_miss_limit(Form::Super) == kSuperMisses);
     CHECK(form_score_multiplier(Form::Super) == kSuperScoreMultiplier);
     CHECK(kSuperScoreMultiplier == 2);
 

@@ -145,8 +145,8 @@ void append_arc(std::vector<Segment>& out, float t0, float t1, bool filled_part)
     segment.x1 = x1;
     segment.y1 = y1;
     segment.depth = 2.5f;
-    segment.color = filled_part ? Rgb{0.95f, 0.82f, 0.2f, 1.f}
-                                 : Rgb{0.f, 104.f / 255.f, 88.f / 255.f, 1.f};
+    segment.color =
+        filled_part ? Rgb{0.95f, 0.82f, 0.2f, 1.f} : Rgb{0.f, 104.f / 255.f, 88.f / 255.f, 1.f};
     out.push_back(segment);
 }
 
@@ -1063,10 +1063,7 @@ CourseFrame draw_course(const CourseTimeline& course,
     if (!show_end && !disc_progress) {
         progress_arc(progress_segments, fill);
     }
-    jitter_segments(progress_segments,
-                    time_ms,
-                    kRibbonJitterRestPs * kStageJitterScale,
-                    0x6D6574u);
+    jitter_segments(progress_segments, time_ms, kRibbonJitterRestPs * kStageJitterScale, 0x6D6574u);
     segments.insert(segments.end(), progress_segments.begin(), progress_segments.end());
     segments.insert(segments.end(), evolution_segments.begin(), evolution_segments.end());
 
@@ -1086,10 +1083,10 @@ CourseFrame draw_course(const CourseTimeline& course,
     const float hud_right = screen_w - 16.f;
     constexpr float kCourseLabelY = static_cast<float>(kLogicalHeight) - 28.f;
     const auto right_label = [&](float y,
-                                  std::string value,
-                                  float scale = 1.f,
-                                  float offset_x = 0.f,
-                                  float horizontal_scale = 1.f) {
+                                 std::string value,
+                                 float scale = 1.f,
+                                 float offset_x = 0.f,
+                                 float horizontal_scale = 1.f) {
         // Measure before the move; argument evaluation order is unspecified.
         const float x =
             hud_right - painter.measure_width(value) * scale * horizontal_scale + offset_x;
@@ -1109,13 +1106,12 @@ CourseFrame draw_course(const CourseTimeline& course,
             animation_elapsed % kRoundBlinkPeriodMs >= kRoundBlinkPeriodMs - kRoundBlinkOffMs) {
             visible = false;
         }
-        const std::int64_t fly_elapsed =
-            animation_elapsed - kBlinkDuration - kRoundSlideDelayMs;
+        const std::int64_t fly_elapsed = animation_elapsed - kBlinkDuration - kRoundSlideDelayMs;
         if (fly_elapsed >= kRoundFlyMs) {
             visible = false;
         }
-        const float fly_progress = std::clamp(
-            static_cast<float>(fly_elapsed) / static_cast<float>(kRoundFlyMs), 0.f, 1.f);
+        const float fly_progress =
+            std::clamp(static_cast<float>(fly_elapsed) / static_cast<float>(kRoundFlyMs), 0.f, 1.f);
         const float offset_x = fly_progress * screen_w;
         if (visible) {
             // Scale uniformly and move left to match the reference HUD.
@@ -1125,15 +1121,12 @@ CourseFrame draw_course(const CourseTimeline& course,
             caption.left = round_right - kCaptionWidth;
             caption.right = round_right;
             caption.bottom = kCourseLabelY - 4.f;
-            caption.top =
-                caption.bottom - kCaptionWidth * 52.f / 240.f;
+            caption.top = caption.bottom - kCaptionWidth * 52.f / 240.f;
             std::vector<Segment> caption_segments;
             const bool disc_caption =
-                assets != nullptr && draw_model_frame(caption_segments,
-                                                      *assets,
-                                                      Slot::RoundCaption,
-                                                      round_number - 1,
-                                                      caption);
+                assets != nullptr &&
+                draw_model_frame(
+                    caption_segments, *assets, Slot::RoundCaption, round_number - 1, caption);
             if (disc_caption) {
                 for (Segment& line : caption_segments) {
                     line.x0 = round_right + (line.x0 - round_right) * kRoundCaptionHorizontalScale;

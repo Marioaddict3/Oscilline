@@ -99,9 +99,9 @@ inline constexpr float kFigureJitterScale = 0.35f;
 
 // Jitter every segment endpoint independently at the given stage amplitude.
 void jitter_segments(std::span<Segment> segments,
-                    std::int64_t time_ms,
-                    float amplitude_ps,
-                    std::uint32_t salt);
+                     std::int64_t time_ms,
+                     float amplitude_ps,
+                     std::uint32_t salt);
 
 // Line vertices of the figure. At the rest amplitude this is a no-op.
 // Above it, each vertex jitters by up to jitter_scale * (amplitude - rest)

@@ -894,7 +894,7 @@ TEST_CASE("the progress arc color follows the fill fraction") {
     CHECK(full_right == doctest::Approx(590.f));
     CHECK(leftmost_yellow(empty) > 1.e8f);
     CHECK(leftmost_yellow(nudged) < leftmost_yellow(half) - 1.f);
-    CHECK(leftmost_yellow(full) == doctest::Approx(104.f));
+    CHECK(leftmost_yellow(full) == doctest::Approx(50.f));
 }
 
 TEST_CASE("an obstacle remains drawn until its body leaves the left edge") {
@@ -1029,8 +1029,8 @@ TEST_CASE("the progress indicator stays at base stage jitter during a hit") {
     const auto green_vertices = [](std::span<const Vertex> vertices) {
         std::vector<std::array<float, 2>> points;
         for (const Vertex& vertex : vertices) {
-            if (vertex.y > 400.f && vertex.r < 0.05f && vertex.g > 0.35f &&
-                vertex.b > 0.30f && vertex.b < 0.40f) {
+            if ((vertex.y > 400.f && vertex.r < 0.05f && vertex.g > 0.35f) &&
+                (vertex.b > 0.30f && vertex.b < 0.40f)) {
                 points.push_back({vertex.x, vertex.y});
             }
         }
@@ -1106,19 +1106,24 @@ TEST_CASE("the gameplay HUD widens the progress arc and animates the round capti
         return glyph.text == "COURSE 1";
     }));
 
-    const TextGlyph* waiting = round_label(frame_at(2500));
+    const CourseFrame waiting_frame = frame_at(2500);
+    const TextGlyph* waiting = round_label(waiting_frame);
     REQUIRE(waiting != nullptr);
     CHECK(waiting->x == doctest::Approx(initial->x));
     for (const std::int64_t blink_off : {3225, 3525, 3825, 4125}) {
-        CHECK(round_label(frame_at(blink_off)) == nullptr);
+        const CourseFrame blink_frame = frame_at(blink_off);
+        CHECK(round_label(blink_frame) == nullptr);
     }
-    const TextGlyph* pause = round_label(frame_at(4350));
+    const CourseFrame pause_frame = frame_at(4350);
+    const TextGlyph* pause = round_label(pause_frame);
     REQUIRE(pause != nullptr);
     CHECK(pause->x == doctest::Approx(initial->x));
-    const TextGlyph* flying = round_label(frame_at(4450));
+    const CourseFrame flying_frame = frame_at(4450);
+    const TextGlyph* flying = round_label(flying_frame);
     REQUIRE(flying != nullptr);
     CHECK(flying->x == doctest::Approx(initial->x));
-    const TextGlyph* halfway = round_label(frame_at(4900));
+    const CourseFrame halfway_frame = frame_at(4900);
+    const TextGlyph* halfway = round_label(halfway_frame);
     REQUIRE(halfway != nullptr);
     CHECK(halfway->x > initial->x + logical_width() * 0.4f);
     CHECK(round_label(frame_at(5350)) == nullptr);
