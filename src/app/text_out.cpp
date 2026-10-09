@@ -16,13 +16,15 @@
 namespace oscilline {
 
 void DebugTextPainter::line(
-    TextTarget& target, float x, float y, std::string value, TextStyle /*style*/) const {
+    TextTarget& target, float x, float y, std::string value, TextStyle style) const {
     if (target.glyphs == nullptr || value.empty()) {
         return;
     }
     TextGlyph item;
     item.x = x;
     item.y = y;
+    item.scale = style.scale;
+    item.horizontal_scale = style.horizontal_scale;
     item.text = std::move(value);
     target.glyphs->push_back(std::move(item));
 }
@@ -73,10 +75,14 @@ void DiscTextPainter::line(
     options.jitter_time_ms = time_ms_;
     options.jitter_x *= jitter_scale_;
     options.jitter_y *= jitter_scale_;
+    options.scale *= style.scale;
+    options.horizontal_scale *= style.horizontal_scale;
+    options.tracking *= style.scale;
+    options.line_width *= style.scale * style.stroke_scale;
     const TextLayout laid = font_.layout(value, options, style.max_width);
     const std::vector<Segment> segments = font_.place(laid, x, y, options, style.color);
     StrokeStyle stroke;
-    stroke.width = options_.line_width;
+    stroke.width = options.line_width;
     stroke.feather = kDiscFontStrokeFeather;
     append_strokes(*target.triangles, segments, stroke);
 }

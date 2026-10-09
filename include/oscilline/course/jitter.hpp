@@ -97,12 +97,19 @@ void append_jittered_obstacle(std::vector<Segment>& out,
 // frames at 4+ misses, where she stays recognizable (about 3 PS px at the peak).
 inline constexpr float kFigureJitterScale = 0.35f;
 
+// Jitter every segment endpoint independently at the given stage amplitude.
+void jitter_segments(std::span<Segment> segments,
+                    std::int64_t time_ms,
+                    float amplitude_ps,
+                    std::uint32_t salt);
+
 // Line vertices of the figure. At the rest amplitude this is a no-op.
-// Above it, each vertex jitters by up to kFigureJitterScale * (amplitude - rest)
+// Above it, each vertex jitters by up to jitter_scale * (amplitude - rest)
 // in x and in y. The figure is not translated as a whole.
 void jitter_figure_vertices(std::span<Segment> segments,
                             std::int64_t time_ms,
                             float amplitude_ps,
-                            std::uint32_t salt);
+                            std::uint32_t salt,
+                            float jitter_scale = kFigureJitterScale);
 
 } // namespace oscilline

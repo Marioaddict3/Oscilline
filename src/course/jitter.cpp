@@ -286,18 +286,17 @@ void append_jittered_obstacle(std::vector<Segment>& out,
     }
 }
 
-void jitter_figure_vertices(std::span<Segment> segments,
-                            std::int64_t time_ms,
-                            float amplitude_ps,
-                            std::uint32_t salt) {
-    const float extra = (amplitude_ps - kRibbonJitterRestPs) * kFigureJitterScale;
-    if (!(extra > 0.f) || segments.empty()) {
+void jitter_segments(std::span<Segment> segments,
+                    std::int64_t time_ms,
+                    float amplitude_ps,
+                    std::uint32_t salt) {
+    if (!(amplitude_ps > 0.f) || !std::isfinite(amplitude_ps) || segments.empty()) {
         return;
     }
-    const float amplitude_x = extra * kPlayStationPixelToLogicalX;
-    const float amplitude_y = extra * kPlayStationPixelToLogicalY;
+    const float amplitude_x = amplitude_ps * kPlayStationPixelToLogicalX;
+    const float amplitude_y = amplitude_ps * kPlayStationPixelToLogicalY;
     const auto shift = [&](float& x, float& y) {
-        const std::uint32_t channel = vertex_channel(x, y, salt ^ 0xF16u);
+        const std::uint32_t channel = vertex_channel(x, y, salt);
         x += ribbon_jitter_offset(time_ms, channel ^ 0x100u, amplitude_x);
         y += ribbon_jitter_offset(time_ms, channel ^ 0x200u, amplitude_y);
     };
@@ -305,6 +304,18 @@ void jitter_figure_vertices(std::span<Segment> segments,
         shift(segment.x0, segment.y0);
         shift(segment.x1, segment.y1);
     }
+}
+
+void jitter_figure_vertices(std::span<Segment> segments,
+                            std::int64_t time_ms,
+                            float amplitude_ps,
+                            std::uint32_t salt,
+                            float jitter_scale) {
+    if (!std::isfinite(jitter_scale) || !(jitter_scale > 0.f)) {
+        return;
+    }
+    const float extra = (amplitude_ps - kRibbonJitterRestPs) * jitter_scale;
+    jitter_segments(segments, time_ms, extra, salt ^ 0xF16u);
 }
 
 } // namespace oscilline

@@ -1419,7 +1419,7 @@ void TitleScreen::draw_about(Canvas& canvas) {
     const float back_x =
         (static_cast<float>(kLogicalWidth) - painter.measure_width("    BACK")) * 0.5f;
     menu_row(canvas.picture, canvas.text, painter, back_x, 398.f, canvas.shown == 0, "BACK");
-    const std::string version = "v0.1";
+    const std::string version = "v0.1.1";
     const float version_x = static_cast<float>(kLogicalWidth) - kMenuFrame - kFooterPad -
                             painter.measure_width(version);
     glyph(canvas.picture, canvas.text, painter, version_x, kFooterBottom, version);

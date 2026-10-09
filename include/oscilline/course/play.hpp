@@ -36,7 +36,8 @@ inline constexpr int kGoodIntoObstacleMs = kGoodWindowMs - kPerfectWindowMs;
 inline constexpr int kScorePerfect = 2;
 inline constexpr int kScoreGood = 1;
 inline constexpr int kScoreStreakCap = 11;
-// Misses inside one form before it drops. Fitted to one no-input pass; tunable.
+// Misses inside one form before it drops. Super has one hit of protection.
+inline constexpr int kSuperMisses = 1;
 inline constexpr int kRabbitMisses = 10;
 inline constexpr int kFrogMisses = 6;
 inline constexpr int kWormMisses = 3;
@@ -215,15 +216,15 @@ inline constexpr int kMusicStartSfxDelayMs = 1000;
     return SfxId::LevelComplete;
 }
 
-// Copies form, damage, and the clear run when `carry` is set. Score, judgment
-// counts, and the obstacle cursor stay as `next` already has them. Out is not carried.
+// Copies form and damage when `carry` is set. The form-up clear run resets
+// for the new round. Score, judgment counts, and the obstacle cursor stay as
+// `next` already has them. Out is not carried.
 inline void carry_form_into(PlayState& next, const PlayState& previous, bool carry) {
     if (!carry || previous.form == Form::Out) {
         return;
     }
     next.form = previous.form;
     next.damage = previous.damage;
-    next.clear_run = previous.clear_run;
     next.score_streak = previous.score_streak;
     // The session supplies prior totals after adding the completed stage bonus.
 }
@@ -329,7 +330,7 @@ PlayAdvanceResult play_advance(PlayState& state,
 [[nodiscard]] inline int form_miss_limit(Form form) {
     switch (form) {
     case Form::Super:
-        return kRabbitMisses;
+        return kSuperMisses;
     case Form::Rabbit:
         return kRabbitMisses;
     case Form::Frog:

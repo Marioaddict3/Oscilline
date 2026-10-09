@@ -14,9 +14,10 @@ struct CourseTimeline;
 
 // A coupon's nominal on-screen height: the 50-unit symbol at the carousel's mean scale.
 inline constexpr float kCouponHeightPx = 50.f * 0.44f;
-// Carousel center line. The back of the semicircle rises 18 px and its coupon
-// shrinks to 0.36, so the topmost edge sits one coupon height below the screen top.
-inline constexpr float kCouponTrackY = kCouponHeightPx + 18.f + 25.f * 0.36f;
+// Carousel center line. The front of the semicircle rises 18 px at scale 0.52,
+// keeping its topmost edge one nominal coupon height below the screen top. The
+// far side drops 18 px and shrinks to scale 0.36.
+inline constexpr float kCouponTrackY = kCouponHeightPx + 18.f + 25.f * 0.52f;
 
 // One revolution per screen crossing, integrated across speed changes. The
 // prelude (negative time) turns at the first obstacle's speed, so the carousel

@@ -509,7 +509,19 @@ void Host::end_frame(const TriangleList& triangles, std::span<const TextGlyph> t
     SDL_SetRenderDrawColorFloat(impl_->renderer, 1.f, 1.f, 1.f, 1.f);
     for (const TextGlyph& glyph : text) {
         if (!glyph.text.empty()) {
-            SDL_RenderDebugText(impl_->renderer, glyph.x, glyph.y, glyph.text.c_str());
+            const float scale_x = glyph.scale * glyph.horizontal_scale;
+            const float scale_y = glyph.scale;
+            if (std::isfinite(scale_x) && scale_x > 0.f && std::isfinite(scale_y) &&
+                scale_y > 0.f && (scale_x != 1.f || scale_y != 1.f)) {
+                SDL_SetRenderScale(impl_->renderer, scale_x, scale_y);
+                SDL_RenderDebugText(impl_->renderer,
+                                    glyph.x / scale_x,
+                                    glyph.y / scale_y,
+                                    glyph.text.c_str());
+                SDL_SetRenderScale(impl_->renderer, 1.f, 1.f);
+            } else {
+                SDL_RenderDebugText(impl_->renderer, glyph.x, glyph.y, glyph.text.c_str());
+            }
         }
     }
     SDL_RenderPresent(impl_->renderer);

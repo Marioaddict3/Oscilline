@@ -5,12 +5,14 @@
 
 #include "course_draw.hpp"
 #include "oscilline/course/camera.hpp"
+#include "oscilline/course/jitter.hpp"
 #include "oscilline/course/shapes.hpp"
 #include "oscilline/render/project.hpp"
 #include "oscilline/render/stroke.hpp"
 #include "oscilline/render/viewport.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstdint>
 #include <doctest/doctest.h>
@@ -881,12 +883,15 @@ TEST_CASE("the progress arc color follows the fill fraction") {
         oscilline::progress_arc_segments(0.5f + 1.f / 64.f);
     const std::vector<oscilline::Segment> full = oscilline::progress_arc_segments(1.f);
     REQUIRE_FALSE(empty.empty());
+    CHECK(empty.front().color.r == doctest::Approx(0.f));
+    CHECK(empty.front().color.g == doctest::Approx(104.f / 255.f));
+    CHECK(empty.front().color.b == doctest::Approx(88.f / 255.f));
     const auto [empty_left, empty_right] = extent(empty);
     const auto [full_left, full_right] = extent(full);
-    CHECK(empty_left == doctest::Approx(104.f));
-    CHECK(empty_right == doctest::Approx(536.f));
-    CHECK(full_left == doctest::Approx(104.f));
-    CHECK(full_right == doctest::Approx(536.f));
+    CHECK(empty_left == doctest::Approx(50.f));
+    CHECK(empty_right == doctest::Approx(590.f));
+    CHECK(full_left == doctest::Approx(50.f));
+    CHECK(full_right == doctest::Approx(590.f));
     CHECK(leftmost_yellow(empty) > 1.e8f);
     CHECK(leftmost_yellow(nudged) < leftmost_yellow(half) - 1.f);
     CHECK(leftmost_yellow(full) == doctest::Approx(104.f));
@@ -964,30 +969,157 @@ TEST_CASE("the score can show as a number and the control line is opt-in") {
     CHECK(number.triangles.vertices.size() < coupons.triangles.vertices.size());
 }
 
-TEST_CASE("the course and round labels are right-aligned at the bottom right") {
+TEST_CASE("impact jitter is stronger on the figure and obstacle") {
+    using namespace oscilline;
+    Segment base;
+    base.x0 = 120.f;
+    base.y0 = 80.f;
+    base.x1 = 180.f;
+    base.y1 = 160.f;
+    std::vector<Segment> regular{base};
+    std::vector<Segment> impact{base};
+    constexpr float amplitude = 15.f;
+    constexpr std::int64_t time = 460;
+    jitter_figure_vertices(regular, time, amplitude, 0xF16u);
+    jitter_figure_vertices(impact, time, amplitude, 0xF16u, 1.f);
+    const float regular_dx = regular.front().x0 - base.x0;
+    const float impact_dx = impact.front().x0 - base.x0;
+    const float regular_dy = regular.front().y0 - base.y0;
+    const float impact_dy = impact.front().y0 - base.y0;
+    CHECK(std::fabs(impact_dx) >= std::fabs(regular_dx));
+    CHECK(std::fabs(impact_dy) >= std::fabs(regular_dy));
+    CHECK(std::fabs(impact_dx) + std::fabs(impact_dy) >
+          std::fabs(regular_dx) + std::fabs(regular_dy));
+
+    std::vector<Segment> obstacle_still;
+    std::vector<Segment> obstacle_stage;
+    std::vector<Segment> obstacle_impact;
+    constexpr std::uint32_t salt = 0xA51u;
+    append_jittered_obstacle(obstacle_still, 0, 220.f, 240.f, 80.f, 1.f, time, 0.f, salt);
+    append_jittered_obstacle(obstacle_stage, 0, 220.f, 240.f, 80.f, 1.f, time, 5.f, salt);
+    append_jittered_obstacle(obstacle_impact, 0, 220.f, 240.f, 80.f, 1.f, time, 14.f, salt);
+    REQUIRE(obstacle_still.size() == obstacle_stage.size());
+    REQUIRE(obstacle_stage.size() == obstacle_impact.size());
+    float stage_delta = 0.f;
+    float impact_delta = 0.f;
+    for (std::size_t i = 0; i < obstacle_still.size(); ++i) {
+        stage_delta += std::fabs(obstacle_stage[i].x0 - obstacle_still[i].x0) +
+                       std::fabs(obstacle_stage[i].y0 - obstacle_still[i].y0) +
+                       std::fabs(obstacle_stage[i].x1 - obstacle_still[i].x1) +
+                       std::fabs(obstacle_stage[i].y1 - obstacle_still[i].y1);
+        impact_delta += std::fabs(obstacle_impact[i].x0 - obstacle_still[i].x0) +
+                        std::fabs(obstacle_impact[i].y0 - obstacle_still[i].y0) +
+                        std::fabs(obstacle_impact[i].x1 - obstacle_still[i].x1) +
+                        std::fabs(obstacle_impact[i].y1 - obstacle_still[i].y1);
+    }
+    CHECK(impact_delta > stage_delta);
+}
+
+TEST_CASE("the progress indicator stays at base stage jitter during a hit") {
+    using namespace oscilline;
+    CourseTimeline course;
+    course.duration_ms = 60000;
+    PlayState hit;
+    hit.hits_since_form = 1;
+    hit.last_hit_ms = 0;
+    hit.last = Judgment::Miss;
+    hit.judged_ms = 0;
+
+    const CourseFrame frame = draw_course(course, hit, 0);
+    const auto green_vertices = [](std::span<const Vertex> vertices) {
+        std::vector<std::array<float, 2>> points;
+        for (const Vertex& vertex : vertices) {
+            if (vertex.y > 400.f && vertex.r < 0.05f && vertex.g > 0.35f &&
+                vertex.b > 0.30f && vertex.b < 0.40f) {
+                points.push_back({vertex.x, vertex.y});
+            }
+        }
+        return points;
+    };
+    constexpr float kBaseStageAmplitudePs = 0.5f;
+    constexpr std::uint32_t kProgressSalt = 0x6D6574u;
+    std::vector<Segment> expected_segments = progress_arc_segments(0.f);
+    jitter_segments(expected_segments, 0, kBaseStageAmplitudePs, kProgressSalt);
+    TriangleList expected_triangles;
+    append_strokes(expected_triangles, expected_segments);
+    const auto actual_points = green_vertices(frame.triangles.vertices);
+    const auto expected_points = green_vertices(expected_triangles.vertices);
+    REQUIRE_FALSE(actual_points.empty());
+    REQUIRE(actual_points.size() == expected_points.size());
+    for (std::size_t i = 0; i < actual_points.size(); ++i) {
+        CHECK(actual_points[i][0] == doctest::Approx(expected_points[i][0]));
+        CHECK(actual_points[i][1] == doctest::Approx(expected_points[i][1]));
+    }
+}
+
+TEST_CASE("taking damage does not add indicator strokes around the figure") {
+    using namespace oscilline;
+    CourseTimeline course;
+    course.duration_ms = 60000;
+    PlayState unharmed;
+    PlayState hit;
+    hit.damage = 1;
+
+    const CourseFrame plain = draw_course(course, unharmed, 1000);
+    const CourseFrame damaged = draw_course(course, hit, 1000);
+    CHECK(damaged.triangles.vertices.size() == plain.triangles.vertices.size());
+}
+
+TEST_CASE("the gameplay HUD widens the progress arc and animates the round caption") {
     using namespace oscilline;
     CourseTimeline course;
     course.duration_ms = 60000;
     const PlayState play;
     CourseView view;
     view.round_number = 2;
-    // The first half of the prelude shows the round label too.
-    const CourseFrame frame = draw_course(course, play, -6000, view);
-    const auto find = [&](std::string_view value) -> const TextGlyph* {
+    const auto frame_at = [&](std::int64_t elapsed) {
+        return draw_course(course, play, elapsed - kCourseStartDelayMs, view);
+    };
+    const auto round_label = [](const CourseFrame& frame) -> const TextGlyph* {
         for (const TextGlyph& glyph : frame.text) {
-            if (glyph.text == value) {
+            if (glyph.text == "Round 2") {
                 return &glyph;
             }
         }
         return nullptr;
     };
-    const TextGlyph* label = find("COURSE 1");
-    const TextGlyph* round = find("ROUND 2");
-    REQUIRE(label != nullptr);
-    REQUIRE(round != nullptr);
-    // Debug text is 8 px per character; both end 16 px from the right edge.
-    const float right = static_cast<float>(logical_width()) - 16.f;
-    CHECK(label->x == doctest::Approx(right - 8.f * 8.f));
-    CHECK(round->x == doctest::Approx(right - 7.f * 8.f));
-    CHECK(round->y < label->y);
+
+    const auto arc = progress_arc_segments(0.f);
+    REQUIRE_FALSE(arc.empty());
+    float min_x = arc.front().x0;
+    float max_x = arc.front().x0;
+    for (const Segment& line : arc) {
+        min_x = std::min({min_x, line.x0, line.x1});
+        max_x = std::max({max_x, line.x0, line.x1});
+    }
+    CHECK(min_x == doctest::Approx(50.f));
+    CHECK(max_x == doctest::Approx(590.f));
+
+    const CourseFrame start = frame_at(0);
+    const TextGlyph* initial = round_label(start);
+    REQUIRE(initial != nullptr);
+    CHECK(initial->scale == doctest::Approx(2.5f));
+    CHECK(initial->horizontal_scale == doctest::Approx(0.70f));
+    CHECK(std::fabs(initial->x + initial->scale * initial->horizontal_scale * 8.f * 7.f -
+                    static_cast<float>(logical_width()) + 16.f + 64.f) < 0.01f);
+    CHECK(std::none_of(start.text.begin(), start.text.end(), [](const TextGlyph& glyph) {
+        return glyph.text == "COURSE 1";
+    }));
+
+    const TextGlyph* waiting = round_label(frame_at(2500));
+    REQUIRE(waiting != nullptr);
+    CHECK(waiting->x == doctest::Approx(initial->x));
+    for (const std::int64_t blink_off : {3225, 3525, 3825, 4125}) {
+        CHECK(round_label(frame_at(blink_off)) == nullptr);
+    }
+    const TextGlyph* pause = round_label(frame_at(4350));
+    REQUIRE(pause != nullptr);
+    CHECK(pause->x == doctest::Approx(initial->x));
+    const TextGlyph* flying = round_label(frame_at(4450));
+    REQUIRE(flying != nullptr);
+    CHECK(flying->x == doctest::Approx(initial->x));
+    const TextGlyph* halfway = round_label(frame_at(4900));
+    REQUIRE(halfway != nullptr);
+    CHECK(halfway->x > initial->x + logical_width() * 0.4f);
+    CHECK(round_label(frame_at(5350)) == nullptr);
 }

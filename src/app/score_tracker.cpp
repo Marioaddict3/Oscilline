@@ -97,10 +97,10 @@ std::vector<Segment> score_tracker_segments(int score, double cycle_phase, Asset
     for (int slot = 0; slot < kCouponCount; ++slot) {
         const int shape = coupons[static_cast<std::size_t>(slot)];
         // First and last coupons sit at opposite ends of a rotating semicircle.
-        const float phase = clock + static_cast<float>(slot) / (2.f * (kCouponCount - 1));
+        const float phase = static_cast<float>(slot) / (2.f * (kCouponCount - 1)) - clock;
         const float angle = phase * kTau;
         float x = center + 125.f * std::sin(angle);
-        float y = kCouponTrackY + 18.f * std::cos(angle);
+        float y = kCouponTrackY - 18.f * std::cos(angle);
         float scale = 0.44f + 0.08f * std::cos(angle);
         float rotation = -angle * 2.f;
         float depth = -std::cos(angle);
@@ -112,7 +112,7 @@ std::vector<Segment> score_tracker_segments(int score, double cycle_phase, Asset
             if (!poses.empty() && poses.front().visible) {
                 const Pose& pose = poses.front();
                 x = center + pose.position_x * 0.37f;
-                y = kCouponTrackY - 18.f + (-pose.position_y - 484.f) * 0.36f;
+                y = kCouponTrackY + 18.f + (pose.position_y + 484.f) * 0.36f;
                 scale = pose.scale_x * 0.4f;
                 rotation = pose.rotation_z;
                 depth = pose.position_z;

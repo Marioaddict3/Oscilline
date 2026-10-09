@@ -35,6 +35,30 @@ constexpr float kRibbonY = 240.f;
 constexpr float kPi = 3.14159265f;
 // Logical px the disc-camera ribbon runs past each screen edge.
 constexpr float kDiscRibbonExtendPx = 6000.f;
+constexpr std::int64_t kRoundAnimationDelayMs = 3000;
+constexpr std::int64_t kRoundBlinkPeriodMs = 300;
+constexpr std::int64_t kRoundBlinkOffMs = 80;
+constexpr int kRoundBlinkCount = 4;
+constexpr std::int64_t kRoundSlideDelayMs = 250;
+constexpr std::int64_t kRoundFlyMs = 900;
+constexpr float kRoundCaptionScale = 2.5f;
+constexpr float kRoundCaptionHorizontalScale = 0.70f;
+constexpr float kRoundCaptionStrokeScale = 0.60f;
+constexpr float kRoundCaptionLeftShift = 64.f;
+constexpr std::int64_t kHitJitterDurationMs = 420;
+constexpr float kStageHitJitterPs = 2.5f;
+constexpr float kFocusedHitJitterPs = 8.f;
+constexpr float kStageJitterScale = 0.5f;
+float hit_jitter_strength(const PlayState& play, std::int64_t time_ms) {
+    if (play.last != Judgment::Miss || play.judged_ms < 0 || time_ms < play.judged_ms) {
+        return 0.f;
+    }
+    const std::int64_t elapsed = time_ms - play.judged_ms;
+    if (elapsed >= kHitJitterDurationMs) {
+        return 0.f;
+    }
+    return 1.f - static_cast<float>(elapsed) / static_cast<float>(kHitJitterDurationMs);
+}
 
 void translate_segments(std::vector<Segment>& segments, float dx, float dy) {
     if (dx == 0.f && dy == 0.f) {
@@ -72,19 +96,6 @@ void add(std::vector<Segment>& out, float x0, float y0, float x1, float y1, floa
     out.push_back(segment);
 }
 
-void damage_strokes(std::vector<Segment>& out, float x, float y, int damage) {
-    constexpr float kDepth = 0.f;
-    const int marks = std::max(damage, 0);
-    for (int i = 0; i < marks; ++i) {
-        const float angle = 0.4f + static_cast<float>(i) * 0.62f;
-        const float reach = 16.f + static_cast<float>(i % 4) * 5.f;
-        const float jx = std::cos(angle) * reach;
-        const float jy = std::sin(angle) * reach * 0.55f - 28.f;
-        const float kink = (i % 2 == 0) ? 5.f : -5.f;
-        add(out, x + jx, y + jy, x + jx * 0.35f + kink, y + jy * 0.45f, kDepth);
-    }
-}
-
 void scribble_burst(
     std::vector<Segment>& out, float x, float y, std::int64_t time_ms, std::int64_t until_ms) {
     if (until_ms <= 0 || time_ms >= until_ms) {
@@ -113,8 +124,8 @@ void scribble_burst(
 // ends never show. The crest stays at y 448.
 void append_arc(std::vector<Segment>& out, float t0, float t1, bool filled_part) {
     const float offset = (static_cast<float>(logical_width() - kLogicalWidth)) * 0.5f;
-    const float left = 104.f + offset;
-    const float right = 536.f + offset;
+    const float left = 50.f + offset;
+    const float right = 590.f + offset;
     constexpr float kEndY = static_cast<float>(kLogicalHeight) + 12.f;
     constexpr float kCrestY = 448.f;
     // A quadratic Bezier's midpoint is halfway between its ends and its control.
@@ -134,7 +145,8 @@ void append_arc(std::vector<Segment>& out, float t0, float t1, bool filled_part)
     segment.x1 = x1;
     segment.y1 = y1;
     segment.depth = 2.5f;
-    segment.color = filled_part ? Rgb{0.95f, 0.82f, 0.2f, 1.f} : Rgb{0.2f, 0.8f, 0.35f, 1.f};
+    segment.color = filled_part ? Rgb{0.95f, 0.82f, 0.2f, 1.f}
+                                 : Rgb{0.f, 104.f / 255.f, 88.f / 255.f, 1.f};
     out.push_back(segment);
 }
 
@@ -737,7 +749,6 @@ CourseFrame draw_course(const CourseTimeline& course,
     const int prior_perfects = view.prior.perfects;
     const int prior_goods = view.prior.goods;
     const int prior_misses = view.prior.misses;
-    const std::string_view heading = view.heading;
     const TextPainter* text = view.text;
     AssetRegistry* assets = view.assets;
     const DiscFigurePose* figure = view.figure;
@@ -811,11 +822,20 @@ CourseFrame draw_course(const CourseTimeline& course,
         std::min(screen_w, static_cast<float>(kLogicalWidth)) * kLoopWidthFraction;
     const float amplitude_ps =
         ribbon_jitter_amplitude_ps(play.form, play.hits_since_form, play.last_hit_ms, time_ms);
+    const float hit_strength = hit_jitter_strength(play, time_ms);
+    const float stage_amplitude_ps =
+        amplitude_ps * kStageJitterScale + kStageHitJitterPs * hit_strength;
+    const float focused_amplitude_ps = amplitude_ps + kFocusedHitJitterPs * hit_strength;
+    const float focused_figure_scale =
+        kFigureJitterScale + (1.f - kFigureJitterScale) * hit_strength;
+    const std::size_t hit_event_index =
+        play.event_index > 0 ? static_cast<std::size_t>(play.event_index - 1) : 0;
 
     struct PlacedObstacle {
         std::uint8_t id = 0;
         float x = 0.f;
         float scale = 1.f;
+        std::size_t event_index = 0;
         std::uint32_t salt = 0;
     };
     std::vector<PlacedObstacle> placed;
@@ -886,6 +906,7 @@ CourseFrame draw_course(const CourseTimeline& course,
             item.id = it->obstacle;
             item.x = x;
             item.scale = scale;
+            item.event_index = static_cast<std::size_t>(it - events.begin());
             item.salt = static_cast<std::uint32_t>(it->hit_ms) ^
                         (static_cast<std::uint32_t>(it->obstacle) << 16);
             placed.push_back(item);
@@ -923,7 +944,7 @@ CourseFrame draw_course(const CourseTimeline& course,
            ribbon_y,
            figure_x,
            attachment_x,
-           amplitude_ps,
+           stage_amplitude_ps,
            ribbon_guides,
            pose.disc ? kDiscRibbonExtendPx : 0.f);
     world.insert(world.end(), window_guides.begin(), window_guides.end());
@@ -938,11 +959,10 @@ CourseFrame draw_course(const CourseTimeline& course,
         PlaceholderFigure{}.paint(figure_lines, play.form, figure_x, ribbon_y);
         projected = false;
     }
-    jitter_figure_vertices(figure_lines, time_ms, amplitude_ps, 0xF16u);
+    jitter_figure_vertices(
+        figure_lines, time_ms, focused_amplitude_ps, 0xF16u, focused_figure_scale);
     std::vector<Segment> marks;
-    damage_strokes(marks, figure_x, ribbon_y, play.damage);
-    jitter_figure_vertices(marks, time_ms, amplitude_ps, 0xF17u);
-    // The ring is not part of her lines, so damage jitter leaves it alone.
+    // Streak and form-drop effects are separate from the removed hit marks.
     streak_ring(marks, figure_x, ribbon_y, screen_h, play);
     scribble_burst(
         marks, figure_x, ribbon_y, std::max<std::int64_t>(time_ms, 0), play.burst_until_ms);
@@ -954,7 +974,9 @@ CourseFrame draw_course(const CourseTimeline& course,
                                  loop_px,
                                  item.scale,
                                  time_ms,
-                                 amplitude_ps,
+                                 item.event_index == hit_event_index && hit_strength > 0.f
+                                     ? focused_amplitude_ps
+                                     : stage_amplitude_ps,
                                  item.salt);
     }
     if (shared_world) {
@@ -997,6 +1019,8 @@ CourseFrame draw_course(const CourseTimeline& course,
     append_super_burst(
         marks, play, course.duration_ms, screen_w, screen_h, time_ms, burst_cameras, disc_camera);
     std::vector<Segment> segments;
+    std::vector<Segment> progress_segments;
+    std::vector<Segment> evolution_segments;
     std::vector<Segment> coupons;
     const int hud_score = play.score + std::max(prior_score, 0);
     if (!show_end && !hud.score_number) {
@@ -1013,7 +1037,7 @@ CourseFrame draw_course(const CourseTimeline& course,
             }
             return std::max(1, static_cast<int>(animations->front().frames.size()));
         }();
-        disc_progress = draw_model_frame(segments,
+        disc_progress = draw_model_frame(progress_segments,
                                          *assets,
                                          Slot::MeterProgress,
                                          meter_frame_index(fill, frames),
@@ -1029,7 +1053,7 @@ CourseFrame draw_course(const CourseTimeline& course,
             evo.top = 64.f;
             evo.right = 96.f;
             evo.bottom = 136.f;
-            draw_model_frame(segments,
+            draw_model_frame(evolution_segments,
                              *assets,
                              Slot::MeterEvolution,
                              meter_frame_index(evolution_fill(play.form), evo_frames),
@@ -1037,8 +1061,14 @@ CourseFrame draw_course(const CourseTimeline& course,
         }
     }
     if (!show_end && !disc_progress) {
-        progress_arc(segments, fill);
+        progress_arc(progress_segments, fill);
     }
+    jitter_segments(progress_segments,
+                    time_ms,
+                    kRibbonJitterRestPs * kStageJitterScale,
+                    0x6D6574u);
+    segments.insert(segments.end(), progress_segments.begin(), progress_segments.end());
+    segments.insert(segments.end(), evolution_segments.begin(), evolution_segments.end());
 
     CourseFrame frame;
     StrokeStyle course_style;
@@ -1052,31 +1082,71 @@ CourseFrame draw_course(const CourseTimeline& course,
     }
     append_strokes(frame.triangles, segments);
     const std::size_t stroked = segments.size();
-    // Course and round labels sit bottom right, right-aligned, with the round above.
+    // The course label is omitted during gameplay; the round caption takes its place.
     const float hud_right = screen_w - 16.f;
     constexpr float kCourseLabelY = static_cast<float>(kLogicalHeight) - 28.f;
-    const auto right_label = [&](float y, std::string value) {
+    const auto right_label = [&](float y,
+                                  std::string value,
+                                  float scale = 1.f,
+                                  float offset_x = 0.f,
+                                  float horizontal_scale = 1.f) {
         // Measure before the move; argument evaluation order is unspecified.
-        const float x = hud_right - painter.measure_width(value);
-        glyph(frame, painter, x, y, std::move(value));
+        const float x =
+            hud_right - painter.measure_width(value) * scale * horizontal_scale + offset_x;
+        TextStyle style;
+        style.scale = scale;
+        style.horizontal_scale = horizontal_scale;
+        style.stroke_scale = kRoundCaptionStrokeScale;
+        glyph(frame, painter, x, y, std::move(value), style);
     };
-    if (!show_end) {
-        right_label(kCourseLabelY,
-                    heading.empty() ? "COURSE " + std::to_string(course.track_index + 1)
-                                    : std::string(heading));
-    }
-    if (round_number > 0 && time_ms < -kCameraIntroMs && !show_end) {
-        // The disc caption keeps its 240 x 52 aspect, scaled to clear the progress arc.
-        ScreenRect caption;
-        caption.right = hud_right;
-        caption.left = hud_right - 160.f;
-        caption.bottom = kCourseLabelY - 4.f;
-        caption.top = caption.bottom - 160.f * 52.f / 240.f;
-        const bool disc_caption =
-            assets != nullptr &&
-            draw_model_frame(segments, *assets, Slot::RoundCaption, round_number - 1, caption);
-        if (!disc_caption) {
-            right_label(kCourseLabelY - 18.f, "ROUND " + std::to_string(round_number));
+    if (round_number > 0 && time_ms < 0 && !show_end) {
+        const std::int64_t elapsed =
+            std::max<std::int64_t>(0, time_ms + kCourseStartDelayMs) - kRoundAnimationDelayMs;
+        constexpr std::int64_t kBlinkDuration = kRoundBlinkPeriodMs * kRoundBlinkCount;
+        bool visible = true;
+        const std::int64_t animation_elapsed = std::max<std::int64_t>(0, elapsed);
+        if (animation_elapsed < kBlinkDuration &&
+            animation_elapsed % kRoundBlinkPeriodMs >= kRoundBlinkPeriodMs - kRoundBlinkOffMs) {
+            visible = false;
+        }
+        const std::int64_t fly_elapsed =
+            animation_elapsed - kBlinkDuration - kRoundSlideDelayMs;
+        if (fly_elapsed >= kRoundFlyMs) {
+            visible = false;
+        }
+        const float fly_progress = std::clamp(
+            static_cast<float>(fly_elapsed) / static_cast<float>(kRoundFlyMs), 0.f, 1.f);
+        const float offset_x = fly_progress * screen_w;
+        if (visible) {
+            // Scale uniformly and move left to match the reference HUD.
+            constexpr float kCaptionWidth = 400.f;
+            const float round_right = hud_right - kRoundCaptionLeftShift + offset_x;
+            ScreenRect caption;
+            caption.left = round_right - kCaptionWidth;
+            caption.right = round_right;
+            caption.bottom = kCourseLabelY - 4.f;
+            caption.top =
+                caption.bottom - kCaptionWidth * 52.f / 240.f;
+            std::vector<Segment> caption_segments;
+            const bool disc_caption =
+                assets != nullptr && draw_model_frame(caption_segments,
+                                                      *assets,
+                                                      Slot::RoundCaption,
+                                                      round_number - 1,
+                                                      caption);
+            if (disc_caption) {
+                for (Segment& line : caption_segments) {
+                    line.x0 = round_right + (line.x0 - round_right) * kRoundCaptionHorizontalScale;
+                    line.x1 = round_right + (line.x1 - round_right) * kRoundCaptionHorizontalScale;
+                }
+                append_strokes(frame.triangles, caption_segments, StrokeStyle{0.75f, 0.35f});
+            } else {
+                right_label(kCourseLabelY - 45.f,
+                            "Round " + std::to_string(round_number),
+                            kRoundCaptionScale,
+                            -kRoundCaptionLeftShift + offset_x,
+                            kRoundCaptionHorizontalScale);
+            }
         }
     }
     if (!show_end && hud.score_number) {

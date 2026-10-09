@@ -180,6 +180,12 @@ TEST_CASE("coupon tracker sits one coupon height below the top and stays centere
     const auto moved = score_tracker_segments(730, 0.25);
     CHECK(moved.front().x0 != doctest::Approx(normal.front().x0));
     CHECK(score_tracker_segments(730, 1.125).front().x0 == doctest::Approx(normal.front().x0));
+
+    // At a quarter-cycle, the first coupon has traveled left from the top.
+    const auto reversed = score_tracker_segments(0, 0.25);
+    REQUIRE(reversed.size() == kCouponCount);
+    CHECK((reversed.front().x0 + reversed.front().x1) / 2 ==
+          doctest::Approx(logical_width() * 0.5 - 125.f));
 }
 
 TEST_CASE("seven coupons occupy exactly one rotating semicircle") {
@@ -190,8 +196,14 @@ TEST_CASE("seven coupons occupy exactly one rotating semicircle") {
         const double angle = 3.141592653589793 * slot / (kCouponCount - 1);
         CHECK((line.x0 + line.x1) / 2 ==
               doctest::Approx(logical_width() * 0.5 + 125 * std::sin(angle)));
-        CHECK((line.y0 + line.y1) / 2 == doctest::Approx(kCouponTrackY + 18 * std::cos(angle)));
+        CHECK((line.y0 + line.y1) / 2 == doctest::Approx(kCouponTrackY - 18 * std::cos(angle)));
     }
+    CHECK(coupons.front().depth == doctest::Approx(-1.f));
+    CHECK(coupons.back().depth == doctest::Approx(1.f));
+    CHECK((coupons.front().y0 + coupons.front().y1) / 2 ==
+          doctest::Approx(kCouponTrackY - 18.f));
+    CHECK((coupons.back().y0 + coupons.back().y1) / 2 ==
+          doctest::Approx(kCouponTrackY + 18.f));
 }
 
 TEST_CASE("the carousel's highest coupon edge is one coupon height from the top") {

@@ -50,7 +50,7 @@ independent of course camera motion and aspect ratio. The carousel's highest
 edge sits one coupon height (22 px) below the top of the screen. Pausing freezes
 its course clock.
 
-Rotation follows the upcoming obstacle's effective stage-scroll travel time,
+Coupons travel counter-clockwise around the semicircle. Rotation follows the upcoming obstacle's effective stage-scroll travel time,
 with one revolution per screen crossing (four seconds at a four-second
 crossing). Its phase integrates speed changes rather than jumping when speed
 changes; the final speed continues through the stage tail. The eight-second

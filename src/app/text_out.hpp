@@ -22,6 +22,12 @@ struct TextStyle {
     float max_width = 0.f;
     // Disc text uses this. Debug text stays the SDL color.
     Rgb color{};
+    // Multiplies text dimensions for emphasized HUD labels.
+    float scale = 1.f;
+    // Compresses or expands glyphs horizontally while preserving their height.
+    float horizontal_scale = 1.f;
+    // Adjusts vector-font outline weight independently from glyph dimensions.
+    float stroke_scale = 1.f;
 };
 
 struct TextTarget {

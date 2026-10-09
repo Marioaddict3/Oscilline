@@ -70,6 +70,8 @@ struct TextGlyph {
     float x = 0;
     float y = 0;
     std::string text;
+    float scale = 1.f;
+    float horizontal_scale = 1.f;
 };
 
 [[nodiscard]] inline bool held(const HostInput& input, Key key) {

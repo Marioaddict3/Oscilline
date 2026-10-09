@@ -152,7 +152,7 @@ The published FSL section offsets match the PAL file. Obstacle values are 32-bit
 
 The ladder is worm → frog → rabbit → super. Eighteen consecutive clears raise one form on every rung. Confidence: high for rabbit → super, from footage of the original. Clears 1 through 17 each light one ring slot. The 18th clear promotes, and no 18th dot is drawn. A miss empties the streak.
 
-Super drops to rabbit after the rabbit miss limit (10). A separate super miss count was not measured. The documented scoring model doubles the capped clear-streak award in Super; other forms share a multiplier of one. See [scoring.md](scoring.md). The hit that promotes is still scored as the form it left. Round 2 carries the form, the damage, and the clear run, including super. Out is not carried.
+Super drops to rabbit after one miss. The documented scoring model doubles the capped clear-streak award in Super; other forms share a multiplier of one. See [scoring.md](scoring.md). The hit that promotes is still scored as the form it left. Round 2 carries the form, the damage, and the clear run, including super. Out is not carried.
 
 The streak ring is drawn, and it is on by default. Confidence: high. H is the 4:3 game-area height. The ring is a near-circle centered on Rabbit, `0.104 H` above the ribbon line, with radii `0.133 H` by `0.145 H`. There are 17 slots at `360/17` degrees (about 21.18). Slot 0 is at 12 o'clock. Each next dot goes counter-clockwise on screen. One pink dot (RGB 208, 88, 176) per consecutive clear. The dot is about 2 PS px. A new dot appears in its slot. A PS px is one pixel of the 512×286 PAL frame. Logical x is `1.25 × PS px` and logical y is `1.678 × PS px`. A miss clears the ring. Super form leaves the ring empty: there is no super streak display.
 

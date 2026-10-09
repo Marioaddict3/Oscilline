@@ -2580,7 +2580,7 @@ TEST_CASE("a pair total adds both rounds and form carries only when asked") {
     carry_form_into(carried, previous, true);
     CHECK(carried.form == Form::Frog);
     CHECK(carried.damage == 2);
-    CHECK(carried.clear_run == 3);
+    CHECK(carried.clear_run == 0);
     CHECK(carried.score == 0);
     CHECK(carried.perfects == 0);
     CHECK(carried.event_index == 0);
@@ -2842,27 +2842,22 @@ TEST_CASE("eighteen clears promote worm, frog, and rabbit, and a miss clears the
     CHECK(streak.damage == 1);
 }
 
-TEST_CASE("super drops to rabbit after the rabbit miss limit") {
+TEST_CASE("one miss drops super to rabbit") {
     using namespace oscilline;
-    CourseTimeline timeline = hits_at(kRabbitMisses, 500, 30000);
+    CourseTimeline timeline = hits_at(1, 500, 30000);
     PlayState state;
     state.form = Form::Super;
     state.clear_run = 5;
     state.super_transform.start_ms = 10;
     state.super_transform.until_ms = 10 + kSuperTransformMs;
-    for (int i = 0; i < kRabbitMisses - 1; ++i) {
-        const ObstacleWindow window = obstacle_window(timeline.events[static_cast<std::size_t>(i)]);
-        play_advance(state, timeline, window.good_open, window.good_close + 1, 0);
-    }
-    CHECK(state.form == Form::Super);
-    CHECK(state.damage == kRabbitMisses - 1);
-    CHECK(state.clear_run == 0);
-    const ObstacleWindow last_window =
-        obstacle_window(timeline.events[static_cast<std::size_t>(kRabbitMisses - 1)]);
-    const std::int64_t when = last_window.good_close + 1;
-    play_advance(state, timeline, last_window.good_open, when, 0);
+
+    const ObstacleWindow window = obstacle_window(timeline.events.front());
+    const std::int64_t when = window.good_close + 1;
+    play_advance(state, timeline, window.good_open, when, 0);
+
     CHECK(state.form == Form::Rabbit);
     CHECK(state.damage == 0);
+    CHECK(state.clear_run == 0);
     CHECK(state.burst_until_ms == when + kFormBurstMs);
     CHECK(state.super_transform.until_ms == 0);
     CHECK_FALSE(state.finished);
@@ -2870,18 +2865,11 @@ TEST_CASE("super drops to rabbit after the rabbit miss limit") {
     PlayState carried;
     carry_form_into(carried, state, true);
     CHECK(carried.form == Form::Rabbit);
-    PlayState super;
-    super.form = Form::Super;
-    super.damage = 2;
-    super.clear_run = 7;
-    super.score = 400;
-    PlayState next;
-    carry_form_into(next, super, true);
-    CHECK(next.form == Form::Super);
-    CHECK(next.damage == 2);
-    CHECK(next.clear_run == 7);
-    CHECK(next.score == 0);
-    CHECK(next.super_transform.until_ms == 0);
+    PlayState rabbit;
+    rabbit.form = Form::Rabbit;
+    play_advance(rabbit, timeline, window.good_open, when, 0);
+    CHECK(rabbit.form == Form::Rabbit);
+    CHECK(rabbit.damage == 1);
 }
 
 TEST_CASE("streak ring dots sit in their slots") {

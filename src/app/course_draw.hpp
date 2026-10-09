@@ -64,7 +64,7 @@ struct CourseView {
     int menu = 0;
     // Replace the gameplay view with the centered results or game-over card.
     bool show_end = false;
-    // Above 0 draws ROUND N during the first half of the eight-second prelude.
+    // Above 0 draws Round N during the first half of the eight-second prelude.
     int round_number = 0;
     // When set, the end screen shows the pair total and combined counts.
     RoundTotals prior;
