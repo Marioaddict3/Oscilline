@@ -1,4 +1,8 @@
-# ![Oscilline](images/Oscilline-Text-Transparent.gif)
+<h1 align="center"><picture>
+  <source media="(prefers-color-scheme: dark)" srcset="/images/Oscilline-Text-Transparent.gif">
+  <source media="(prefers-color-scheme: light)" srcset="/images/Oscilline-Text-Transparent-Black.gif">
+  <img alt="Oscilline" src="/images/Oscilline-Text-Transparent.gif">
+</picture></h1>
 
 A clean-room behavioral reimplementation engine for a 1999 PlayStation vector rhythm game, written in C++20 with SDL3.
 
